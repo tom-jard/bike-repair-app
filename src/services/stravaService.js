@@ -6,6 +6,7 @@ class StravaService {
     this.refreshToken = localStorage.getItem('strava_refresh_token');
     this.tokenExpiry = localStorage.getItem('strava_token_expiry');
     this.lastRequestTime = 0;
+    this.isDemoMode = true; // Always run in demo mode for this version
   }
 
   // Rate limiting helper
@@ -21,29 +22,19 @@ class StravaService {
     this.lastRequestTime = Date.now();
   }
 
-  // Generate Strava OAuth URL
+  // Generate demo auth URL (doesn't actually go to Strava)
   getAuthUrl() {
-    const params = new URLSearchParams({
-      client_id: STRAVA_CONFIG.client_id,
-      redirect_uri: STRAVA_CONFIG.redirect_uri,
-      response_type: 'code',
-      scope: STRAVA_CONFIG.scope,
-      approval_prompt: 'auto'
-    });
-
-    return `${STRAVA_ENDPOINTS.authorize}?${params.toString()}`;
+    // In demo mode, return a fake URL that will trigger our demo flow
+    return window.location.origin + '?code=demo_auth_code&scope=read,activity:read_all';
   }
 
-  // Exchange authorization code for access token
+  // Simulate token exchange (no external requests)
   async exchangeToken(code) {
     try {
-      // For demo purposes, we'll simulate a successful token exchange
-      // In production, this MUST be done server-side
-      
-      console.warn('⚠️ DEMO MODE: Token exchange simulated. In production, this must be done server-side.');
+      console.log('🎭 DEMO MODE: Simulating Strava authentication...');
       
       // Simulate API response delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Generate mock tokens for demo
       const mockTokenData = {
@@ -53,10 +44,11 @@ class StravaService {
         athlete: {
           id: 12345,
           firstname: "Demo",
-          lastname: "User",
+          lastname: "Cyclist",
           city: "San Francisco",
           state: "CA",
-          country: "USA"
+          country: "USA",
+          profile: "https://via.placeholder.com/150"
         }
       };
       
@@ -72,19 +64,19 @@ class StravaService {
       
       return mockTokenData;
     } catch (error) {
-      console.error('Token exchange error:', error);
-      throw new Error('Failed to authenticate with Strava. Please try again.');
+      console.error('Demo token exchange error:', error);
+      throw new Error('Demo authentication failed. Please try again.');
     }
   }
 
-  // Refresh access token if needed
+  // Simulate token refresh (no external requests)
   async refreshAccessToken() {
     if (!this.refreshToken) {
       throw new Error('No refresh token available');
     }
 
     try {
-      console.warn('⚠️ DEMO MODE: Token refresh simulated.');
+      console.log('🎭 DEMO MODE: Simulating token refresh...');
       
       // Simulate refresh delay
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -104,7 +96,7 @@ class StravaService {
       
       return mockTokenData;
     } catch (error) {
-      console.error('Token refresh error:', error);
+      console.error('Demo token refresh error:', error);
       this.logout();
       throw error;
     }
@@ -123,29 +115,24 @@ class StravaService {
     }
   }
 
-  // Make authenticated API request (demo mode)
-  async makeAuthenticatedRequest(url, options = {}) {
+  // Simulate API request (no external requests)
+  async makeAuthenticatedRequest(endpoint) {
     await this.ensureValidToken();
     await this.enforceRateLimit();
 
-    // In demo mode, we'll simulate API responses
-    console.log(`🔄 Demo API Request: ${url}`);
+    console.log(`🎭 DEMO MODE: Simulating API request to ${endpoint}`);
     
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
     
-    return {
-      ok: true,
-      status: 200,
-      json: async () => {
-        if (url.includes('/athlete/activities')) {
-          return this.generateMockActivities();
-        } else if (url.includes('/athlete')) {
-          return this.getMockAthlete();
-        }
-        return {};
-      }
-    };
+    // Return mock response based on endpoint
+    if (endpoint.includes('/athlete/activities')) {
+      return this.generateMockActivities();
+    } else if (endpoint.includes('/athlete')) {
+      return this.getMockAthlete();
+    }
+    
+    return {};
   }
 
   // Generate mock activities for demo
@@ -153,55 +140,78 @@ class StravaService {
     const activities = [];
     const now = new Date();
     
-    for (let i = 0; i < 10; i++) {
-      const date = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000) - Math.random() * 12 * 60 * 60 * 1000);
-      const distance = 2000 + Math.random() * 15000; // 2-17km
-      const movingTime = 600 + Math.random() * 3000; // 10-60 minutes
-      
-      // Generate realistic coordinates (San Francisco Bay Area)
-      const baseLat = 37.7749;
-      const baseLng = -122.4194;
-      const startLat = baseLat + (Math.random() - 0.5) * 0.1;
-      const startLng = baseLng + (Math.random() - 0.5) * 0.1;
-      const endLat = startLat + (Math.random() - 0.5) * 0.05;
-      const endLng = startLng + (Math.random() - 0.5) * 0.05;
-      
-      activities.push({
-        id: 1000000 + i,
-        name: this.generateRideName(i),
-        type: 'Ride',
-        sport_type: 'Ride',
-        start_date: date.toISOString(),
-        distance: distance,
-        moving_time: movingTime,
-        start_latlng: [startLat, startLng],
-        end_latlng: [endLat, endLng],
-        average_speed: distance / movingTime,
-        max_speed: (distance / movingTime) * 1.5,
-        total_elevation_gain: Math.random() * 500,
-        has_heartrate: Math.random() > 0.3,
-        average_heartrate: 140 + Math.random() * 40,
-        max_heartrate: 160 + Math.random() * 40
-      });
-    }
-    
-    return activities;
-  }
-
-  generateRideName(index) {
-    const names = [
-      "Morning Commute",
+    const rideNames = [
+      "Morning Commute to Downtown",
       "Evening Ride Home",
       "Weekend Coffee Run",
       "Golden Gate Park Loop",
       "Bay Trail Adventure",
       "Hill Climb Challenge",
       "Lunch Break Ride",
-      "Sunset Cruise",
+      "Sunset Cruise Along Embarcadero",
       "Market Street Sprint",
       "Presidio Exploration"
     ];
-    return names[index % names.length];
+
+    const locations = [
+      // SF Financial District to Mission
+      { start: [37.7946, -122.3999], end: [37.7599, -122.4148] },
+      // Castro to Fisherman's Wharf
+      { start: [37.7609, -122.4350], end: [37.8080, -122.4177] },
+      // Sunset to Downtown
+      { start: [37.7431, -122.4660], end: [37.7879, -122.4075] },
+      // Richmond to SOMA
+      { start: [37.7806, -122.4644], end: [37.7749, -122.4194] },
+      // Potrero Hill to North Beach
+      { start: [37.7587, -122.4043], end: [37.8006, -122.4103] },
+      // Haight to Financial District
+      { start: [37.7692, -122.4481], end: [37.7946, -122.3999] },
+      // Marina to Mission Bay
+      { start: [37.8021, -122.4416], end: [37.7706, -122.3900] },
+      // Noe Valley to Chinatown
+      { start: [37.7506, -122.4331], end: [37.7941, -122.4078] },
+      // Glen Park to Russian Hill
+      { start: [37.7338, -122.4336], end: [37.8014, -122.4186] },
+      // Bernal Heights to Pacific Heights
+      { start: [37.7441, -122.4147], end: [37.7886, -122.4324] }
+    ];
+    
+    for (let i = 0; i < 10; i++) {
+      const daysAgo = i + Math.random() * 2;
+      const date = new Date(now.getTime() - (daysAgo * 24 * 60 * 60 * 1000));
+      
+      // Vary ride characteristics
+      const baseDistance = 3000 + Math.random() * 12000; // 3-15km
+      const hilliness = Math.random();
+      const elevationGain = hilliness * 400; // 0-400m elevation
+      
+      // Calculate realistic moving time based on distance and elevation
+      const baseSpeed = 20 - (hilliness * 5); // 15-20 km/h depending on hills
+      const movingTimeHours = (baseDistance / 1000) / baseSpeed;
+      const movingTime = movingTimeHours * 3600; // Convert to seconds
+      
+      const location = locations[i % locations.length];
+      
+      activities.push({
+        id: 1000000 + i,
+        name: rideNames[i % rideNames.length],
+        type: 'Ride',
+        sport_type: 'Ride',
+        start_date: date.toISOString(),
+        distance: baseDistance,
+        moving_time: Math.round(movingTime),
+        start_latlng: location.start,
+        end_latlng: location.end,
+        average_speed: baseDistance / movingTime, // m/s
+        max_speed: (baseDistance / movingTime) * 1.4, // m/s
+        total_elevation_gain: Math.round(elevationGain),
+        has_heartrate: Math.random() > 0.2,
+        average_heartrate: Math.round(140 + Math.random() * 30),
+        max_heartrate: Math.round(170 + Math.random() * 20)
+      });
+    }
+    
+    return activities.sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
   }
 
   getMockAthlete() {
@@ -213,7 +223,7 @@ class StravaService {
     return {
       id: 12345,
       firstname: "Demo",
-      lastname: "User",
+      lastname: "Cyclist",
       city: "San Francisco",
       state: "CA",
       country: "USA",
@@ -224,40 +234,22 @@ class StravaService {
   // Get athlete information
   async getAthlete() {
     try {
-      const response = await this.makeAuthenticatedRequest(STRAVA_ENDPOINTS.athlete);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch athlete data');
-      }
-
-      return await response.json();
+      return await this.makeAuthenticatedRequest('/athlete');
     } catch (error) {
       console.error('Error fetching athlete:', error);
       throw error;
     }
   }
 
-  // Get recent activities with improved error handling
+  // Get recent activities
   async getActivities(page = 1, perPage = 30) {
     try {
-      const params = new URLSearchParams({
-        page: page.toString(),
-        per_page: Math.min(perPage, 200).toString()
-      });
-
-      const response = await this.makeAuthenticatedRequest(
-        `${STRAVA_ENDPOINTS.activities}?${params.toString()}`
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch activities: ${response.status}`);
-      }
-
-      const activities = await response.json();
+      const activities = await this.makeAuthenticatedRequest('/athlete/activities');
       
-      // Filter for rides only and add additional data
+      // Filter for rides only and format data
       return activities
         .filter(activity => activity.type === 'Ride')
+        .slice((page - 1) * perPage, page * perPage)
         .map(activity => ({
           id: activity.id,
           name: activity.name,
@@ -323,7 +315,7 @@ class StravaService {
       hasRefreshToken: !!this.refreshToken,
       expiresAt: this.tokenExpiry ? new Date(this.tokenExpiry) : null,
       isExpired: this.tokenExpiry ? Date.now() > this.tokenExpiry : false,
-      isDemoMode: true
+      isDemoMode: this.isDemoMode
     };
   }
 
