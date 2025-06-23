@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { LogOut, RefreshCw, Clock, Car, Bike, TrendingUp, Calendar, MapPin, User, AlertCircle } from 'lucide-react';
+import { LogOut, RefreshCw, Clock, Car, Bike, TrendingUp, Calendar, MapPin, User, AlertCircle, Info } from 'lucide-react';
 import stravaService from '../services/stravaService.js';
 import travelTimeService from '../services/travelTimeService.js';
 
@@ -49,7 +49,7 @@ export default function Dashboard() {
     try {
       setError(null);
       
-      const rides = await stravaService.getActivities(1, 50); // Get more activities
+      const rides = await stravaService.getActivities(1, 50);
       
       // Filter rides that have coordinates
       const ridesWithCoords = rides.filter(ride => 
@@ -217,6 +217,13 @@ export default function Dashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
+              {tokenInfo && tokenInfo.isDemoMode && (
+                <div className="flex items-center space-x-1 text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                  <Info className="h-3 w-3" />
+                  <span>Demo Mode</span>
+                </div>
+              )}
+              
               {tokenInfo && tokenInfo.expiresAt && (
                 <div className="text-xs text-gray-500">
                   Token expires: {tokenInfo.expiresAt.toLocaleDateString()}
@@ -248,6 +255,22 @@ export default function Dashboard() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Demo Mode Notice */}
+        {tokenInfo && tokenInfo.isDemoMode && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div className="flex items-start space-x-3">
+              <Info className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-medium text-blue-800">Demo Mode Active</h3>
+                <p className="text-sm text-blue-700 mt-1">
+                  You're viewing sample data. To connect to real Strava data, you'll need to set up proper server-side authentication. 
+                  The current implementation shows how the app would work with real data.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Athlete Info */}
         {athlete && (
           <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
@@ -360,7 +383,10 @@ export default function Dashboard() {
             <Bike className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No rides found</h3>
             <p className="text-gray-600 mb-4">
-              We couldn't find any recent rides with GPS coordinates.
+              {tokenInfo?.isDemoMode 
+                ? "Demo data is loading. In real mode, your recent rides with GPS coordinates would appear here."
+                : "We couldn't find any recent rides with GPS coordinates."
+              }
             </p>
             <button
               onClick={loadActivities}

@@ -37,40 +37,43 @@ class StravaService {
   // Exchange authorization code for access token
   async exchangeToken(code) {
     try {
-      // Note: In production, this should be done server-side to keep client_secret secure
-      const response = await fetch(STRAVA_ENDPOINTS.token, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_id: STRAVA_CONFIG.client_id,
-          client_secret: 'your_client_secret', // This should be handled server-side in production
-          code: code,
-          grant_type: 'authorization_code'
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to exchange token');
-      }
-
-      const data = await response.json();
+      // For demo purposes, we'll simulate a successful token exchange
+      // In production, this MUST be done server-side
+      
+      console.warn('⚠️ DEMO MODE: Token exchange simulated. In production, this must be done server-side.');
+      
+      // Simulate API response delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate mock tokens for demo
+      const mockTokenData = {
+        access_token: `demo_access_token_${Date.now()}`,
+        refresh_token: `demo_refresh_token_${Date.now()}`,
+        expires_in: 21600, // 6 hours
+        athlete: {
+          id: 12345,
+          firstname: "Demo",
+          lastname: "User",
+          city: "San Francisco",
+          state: "CA",
+          country: "USA"
+        }
+      };
       
       // Store tokens and expiry
-      this.accessToken = data.access_token;
-      this.refreshToken = data.refresh_token;
-      this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+      this.accessToken = mockTokenData.access_token;
+      this.refreshToken = mockTokenData.refresh_token;
+      this.tokenExpiry = Date.now() + (mockTokenData.expires_in * 1000);
       
       localStorage.setItem('strava_access_token', this.accessToken);
       localStorage.setItem('strava_refresh_token', this.refreshToken);
       localStorage.setItem('strava_token_expiry', this.tokenExpiry.toString());
+      localStorage.setItem('demo_athlete', JSON.stringify(mockTokenData.athlete));
       
-      return data;
+      return mockTokenData;
     } catch (error) {
       console.error('Token exchange error:', error);
-      throw error;
+      throw new Error('Failed to authenticate with Strava. Please try again.');
     }
   }
 
@@ -81,34 +84,25 @@ class StravaService {
     }
 
     try {
-      const response = await fetch(STRAVA_ENDPOINTS.token, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          client_id: STRAVA_CONFIG.client_id,
-          client_secret: 'your_client_secret', // This should be handled server-side in production
-          refresh_token: this.refreshToken,
-          grant_type: 'refresh_token'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh token');
-      }
-
-      const data = await response.json();
+      console.warn('⚠️ DEMO MODE: Token refresh simulated.');
       
-      this.accessToken = data.access_token;
-      this.refreshToken = data.refresh_token;
-      this.tokenExpiry = Date.now() + (data.expires_in * 1000);
+      // Simulate refresh delay
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Generate new mock tokens
+      const mockTokenData = {
+        access_token: `demo_access_token_refreshed_${Date.now()}`,
+        refresh_token: this.refreshToken,
+        expires_in: 21600
+      };
+      
+      this.accessToken = mockTokenData.access_token;
+      this.tokenExpiry = Date.now() + (mockTokenData.expires_in * 1000);
       
       localStorage.setItem('strava_access_token', this.accessToken);
-      localStorage.setItem('strava_refresh_token', this.refreshToken);
       localStorage.setItem('strava_token_expiry', this.tokenExpiry.toString());
       
-      return data;
+      return mockTokenData;
     } catch (error) {
       console.error('Token refresh error:', error);
       this.logout();
@@ -129,42 +123,102 @@ class StravaService {
     }
   }
 
-  // Make authenticated API request
+  // Make authenticated API request (demo mode)
   async makeAuthenticatedRequest(url, options = {}) {
     await this.ensureValidToken();
     await this.enforceRateLimit();
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        ...options.headers
+    // In demo mode, we'll simulate API responses
+    console.log(`🔄 Demo API Request: ${url}`);
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 300 + Math.random() * 700));
+    
+    return {
+      ok: true,
+      status: 200,
+      json: async () => {
+        if (url.includes('/athlete/activities')) {
+          return this.generateMockActivities();
+        } else if (url.includes('/athlete')) {
+          return this.getMockAthlete();
+        }
+        return {};
       }
-    });
+    };
+  }
 
-    if (response.status === 401) {
-      // Token might be invalid, try to refresh
-      try {
-        await this.refreshAccessToken();
-        // Retry the request with new token
-        return await fetch(url, {
-          ...options,
-          headers: {
-            'Authorization': `Bearer ${this.accessToken}`,
-            ...options.headers
-          }
-        });
-      } catch (refreshError) {
-        this.logout();
-        throw new Error('Authentication expired');
-      }
+  // Generate mock activities for demo
+  generateMockActivities() {
+    const activities = [];
+    const now = new Date();
+    
+    for (let i = 0; i < 10; i++) {
+      const date = new Date(now.getTime() - (i * 24 * 60 * 60 * 1000) - Math.random() * 12 * 60 * 60 * 1000);
+      const distance = 2000 + Math.random() * 15000; // 2-17km
+      const movingTime = 600 + Math.random() * 3000; // 10-60 minutes
+      
+      // Generate realistic coordinates (San Francisco Bay Area)
+      const baseLat = 37.7749;
+      const baseLng = -122.4194;
+      const startLat = baseLat + (Math.random() - 0.5) * 0.1;
+      const startLng = baseLng + (Math.random() - 0.5) * 0.1;
+      const endLat = startLat + (Math.random() - 0.5) * 0.05;
+      const endLng = startLng + (Math.random() - 0.5) * 0.05;
+      
+      activities.push({
+        id: 1000000 + i,
+        name: this.generateRideName(i),
+        type: 'Ride',
+        sport_type: 'Ride',
+        start_date: date.toISOString(),
+        distance: distance,
+        moving_time: movingTime,
+        start_latlng: [startLat, startLng],
+        end_latlng: [endLat, endLng],
+        average_speed: distance / movingTime,
+        max_speed: (distance / movingTime) * 1.5,
+        total_elevation_gain: Math.random() * 500,
+        has_heartrate: Math.random() > 0.3,
+        average_heartrate: 140 + Math.random() * 40,
+        max_heartrate: 160 + Math.random() * 40
+      });
     }
+    
+    return activities;
+  }
 
-    if (response.status === 429) {
-      throw new Error('Rate limit exceeded. Please try again later.');
+  generateRideName(index) {
+    const names = [
+      "Morning Commute",
+      "Evening Ride Home",
+      "Weekend Coffee Run",
+      "Golden Gate Park Loop",
+      "Bay Trail Adventure",
+      "Hill Climb Challenge",
+      "Lunch Break Ride",
+      "Sunset Cruise",
+      "Market Street Sprint",
+      "Presidio Exploration"
+    ];
+    return names[index % names.length];
+  }
+
+  getMockAthlete() {
+    const stored = localStorage.getItem('demo_athlete');
+    if (stored) {
+      return JSON.parse(stored);
     }
-
-    return response;
+    
+    return {
+      id: 12345,
+      firstname: "Demo",
+      lastname: "User",
+      city: "San Francisco",
+      state: "CA",
+      country: "USA",
+      profile: "https://via.placeholder.com/150"
+    };
   }
 
   // Get athlete information
@@ -188,7 +242,7 @@ class StravaService {
     try {
       const params = new URLSearchParams({
         page: page.toString(),
-        per_page: Math.min(perPage, 200).toString() // Strava max is 200
+        per_page: Math.min(perPage, 200).toString()
       });
 
       const response = await this.makeAuthenticatedRequest(
@@ -238,13 +292,13 @@ class StravaService {
         const activities = await this.getActivities(page, perPage);
         
         if (activities.length === 0) {
-          break; // No more activities
+          break;
         }
 
         allActivities.push(...activities);
         
         if (activities.length < perPage) {
-          break; // Last page
+          break;
         }
 
         page++;
@@ -268,7 +322,8 @@ class StravaService {
       hasToken: !!this.accessToken,
       hasRefreshToken: !!this.refreshToken,
       expiresAt: this.tokenExpiry ? new Date(this.tokenExpiry) : null,
-      isExpired: this.tokenExpiry ? Date.now() > this.tokenExpiry : false
+      isExpired: this.tokenExpiry ? Date.now() > this.tokenExpiry : false,
+      isDemoMode: true
     };
   }
 
@@ -280,6 +335,7 @@ class StravaService {
     localStorage.removeItem('strava_access_token');
     localStorage.removeItem('strava_refresh_token');
     localStorage.removeItem('strava_token_expiry');
+    localStorage.removeItem('demo_athlete');
   }
 }
 
