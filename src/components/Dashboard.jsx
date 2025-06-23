@@ -52,11 +52,21 @@ export default function Dashboard() {
       const rides = await stravaService.getActivities(1, 50);
       
       // Filter rides that have coordinates
-      const ridesWithCoords = rides.filter(ride => 
-        ride.startCoords && ride.endCoords && 
-        ride.startCoords.length === 2 && ride.endCoords.length === 2 &&
-        ride.distance > 500 // Filter out very short rides (less than 500m)
-      );
+      const ridesWithCoords = rides.filter(ride => {
+        const hasValidCoords = ride.startCoords && ride.endCoords && 
+          ride.startCoords.length === 2 && ride.endCoords.length === 2 &&
+          ride.startCoords[0] !== 0 && ride.startCoords[1] !== 0 &&
+          ride.endCoords[0] !== 0 && ride.endCoords[1] !== 0 &&
+          ride.distance > 500; // Filter out very short rides (less than 500m)
+        
+        if (!hasValidCoords) {
+          console.log('Filtering out ride without valid coords:', ride.name, ride.startCoords, ride.endCoords);
+        }
+        
+        return hasValidCoords;
+      });
+
+      console.log(`Loaded ${ridesWithCoords.length} rides with valid coordinates`);
 
       setActivities(ridesWithCoords.map(ride => ({
         ...ride,
@@ -66,13 +76,36 @@ export default function Dashboard() {
         error: null
       })));
 
+      // Auto-analyze the first few rides for demo
+      if (ridesWithCoords.length > 0) {
+        setTimeout(() => {
+          autoAnalyzeFirstRides(ridesWithCoords.slice(0, 3));
+        }, 1000);
+      }
+
     } catch (err) {
       console.error('Error loading activities:', err);
       setError(err.message);
     }
   };
 
+  const autoAnalyzeFirstRides = async (ridesToAnalyze) => {
+    console.log('🔄 Auto-analyzing first few rides...');
+    
+    for (const ride of ridesToAnalyze) {
+      try {
+        await analyzeActivity(ride.id);
+        // Add delay between analyses
+        await new Promise(resolve => setTimeout(resolve, 500));
+      } catch (error) {
+        console.error('Error in auto-analysis:', error);
+      }
+    }
+  };
+
   const analyzeActivity = async (activityId) => {
+    console.log(`🔍 Analyzing activity ${activityId}...`);
+    
     setActivities(prev => prev.map(activity => 
       activity.id === activityId 
         ? { ...activity, analyzing: true, error: null }
@@ -82,15 +115,35 @@ export default function Dashboard() {
     try {
       const activity = activities.find(a => a.id === activityId);
       
+      if (!activity) {
+        throw new Error('Activity not found');
+      }
+
+      console.log('Activity to analyze:', {
+        id: activity.id,
+        name: activity.name,
+        startCoords: activity.startCoords,
+        endCoords: activity.endCoords,
+        date: activity.date
+      });
+
       const carData = await travelTimeService.getCarTravelTime(
         activity.startCoords,
         activity.endCoords,
         activity.date
       );
 
+      console.log('Car data received:', carData);
+
       const bikeTimeMinutes = activity.movingTime / 60;
       const carTimeMinutes = carData.duration / 60;
       const timeSaved = carTimeMinutes - bikeTimeMinutes;
+
+      console.log('Time comparison:', {
+        bikeTimeMinutes: bikeTimeMinutes.toFixed(1),
+        carTimeMinutes: carTimeMinutes.toFixed(1),
+        timeSaved: timeSaved.toFixed(1)
+      });
 
       setActivities(prev => prev.map(a => 
         a.id === activityId 
@@ -120,10 +173,12 @@ export default function Dashboard() {
     
     const unanalyzedActivities = activities.filter(a => !a.carTravelTime && !a.analyzing);
     
+    console.log(`🔄 Analyzing ${unanalyzedActivities.length} unanalyzed activities...`);
+    
     for (const activity of unanalyzedActivities) {
       await analyzeActivity(activity.id);
-      // Add delay to respect rate limits
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Add delay to respect rate limits and show progress
+      await new Promise(resolve => setTimeout(resolve, 800));
     }
     
     setAnalyzing(false);
@@ -263,8 +318,8 @@ export default function Dashboard() {
               <div>
                 <h3 className="text-sm font-medium text-blue-800">Demo Mode Active</h3>
                 <p className="text-sm text-blue-700 mt-1">
-                  You're viewing sample data. To connect to real Strava data, you'll need to set up proper server-side authentication. 
-                  The current implementation shows how the app would work with real data.
+                  You're viewing sample data from San Francisco Bay Area. Car travel times are calculated using realistic traffic patterns. 
+                  The first few rides are automatically analyzed to show you how the app works.
                 </p>
               </div>
             </div>
@@ -452,7 +507,9 @@ export default function Dashboard() {
                           <p className="text-lg font-semibold text-gray-900">
                             {activity.carTravelTime 
                               ? formatTime(activity.carTravelTime.duration)
-                              : '—'
+                              : activity.analyzing 
+                                ? '...'
+                                : '—'
                             }
                           </p>
                         </div>
@@ -466,7 +523,9 @@ export default function Dashboard() {
                           <p className="text-lg font-semibold">
                             {activity.timeSaved !== null 
                               ? `${activity.timeSaved > 0 ? '+' : ''}${Math.round(activity.timeSaved)}m`
-                              : '—'
+                              : activity.analyzing
+                                ? '...'
+                                : '—'
                             }
                           </p>
                         </div>
