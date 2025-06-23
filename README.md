@@ -1,295 +1,265 @@
-# Bike Repair App - Strava Traffic Monitor
+# Strava Time Savings Analyzer
 
-A comprehensive Python application that monitors Strava activities and compares bike ride times to car travel times using real traffic data. Perfect for cyclists who want to track their time savings and traffic efficiency.
+A React web application that integrates with the Strava API to analyze and visualize time savings from biking versus driving.
 
-## 🚴‍♂️ Features
+## Features
 
-### Core Functionality
-- **Real-time Strava monitoring** - Automatically detects completed rides
-- **Traffic comparison** - Compares bike times to car travel times with real traffic data
-- **Offline resilience** - Stores activities when offline, processes when connection returns
-- **Web dashboard** - Beautiful interface accessible from any device
-- **Mobile app experience** - Add to home screen for native app feel
+- **Strava OAuth Integration**: Secure authentication with your Strava account
+- **Intelligent Travel Time Estimation**: 
+  - Uses Google Maps Directions API when available
+  - Falls back to smart mock algorithm considering traffic patterns, parking time, and delays
+- **Time Comparison Analysis**: Compare actual bike times vs estimated car travel times
+- **Beautiful Dashboard**: Clean, responsive interface showing:
+  - Individual ride analysis
+  - Summary statistics
+  - Traffic condition indicators
+  - Time savings visualization
+- **Rate Limiting**: Respects Strava API limits with automatic token refresh
 
-### Brake Pad Wear Analysis
-- **Standalone version** - Manual input for wear estimation
-- **Strava-integrated version** - Real ride data with weather integration
-- **Material-specific calculations** - Different wear rates for various brake pad types
-- **Weather and terrain factors** - Comprehensive wear modeling
+## Setup
 
-## 📁 Project Structure
+### 1. Strava API Configuration
 
-```
-Bike Repair App/
-├── Core Modules/
-│   ├── strava_monitor.py              # Main monitoring system
-│   ├── traffic_comparison.py          # Traffic analysis engine
-│   ├── strava_brake_wear_estimator.py # Strava-integrated brake analysis
-│   └── brake_wear_estimator.py        # Standalone brake analysis
-│
-├── Web Interface/
-│   ├── web_dashboard.py               # Flask web server
-│   └── templates/dashboard.html       # Dashboard UI
-│
-├── Service Management/
-│   ├── start_mac_mini_service.py      # Mac Mini service manager
-│   ├── run_monitor.py                 # Monitor runner
-│   ├── run_strava_analysis.py         # Brake wear analysis runner
-│   └── run_traffic_analysis.py        # Traffic analysis runner
-│
-├── Data Capture/
-│   ├── capture_historical_traffic.py  # Historical data capture
-│   └── get_strava_token.py            # Strava OAuth helper
-│
-├── Testing & Examples/
-│   ├── test_sample.py                 # Sample brake wear test
-│   └── test_traffic_comparison.py     # Traffic comparison demo
-│
-├── Configuration/
-│   ├── config_example.py              # Configuration template
-│   └── requirements.txt               # Python dependencies
-│
-├── Documentation/
-│   ├── README.md                      # This file
-│   ├── MAC_MINI_SETUP.md             # Mac Mini deployment guide
-│   └── README_Strava.md               # Detailed Strava documentation
-│
-└── Database/
-    └── traffic_comparisons.db         # SQLite database (auto-created)
+1. Go to [Strava API Settings](https://www.strava.com/settings/api)
+2. Create a new application with these settings:
+   - **Application Name**: Your app name
+   - **Category**: Choose appropriate category
+   - **Club**: Leave blank unless applicable
+   - **Website**: Your website or `http://localhost:3000`
+   - **Authorization Callback Domain**: `localhost` (for development)
+3. Copy your Client ID and Client Secret
+4. Update `src/config/strava.js`:
+
+```javascript
+export const STRAVA_CONFIG = {
+  client_id: "your_actual_strava_client_id",
+  redirect_uri: window.location.origin + "/auth/callback",
+  scope: "read,activity:read_all"
+};
 ```
 
-## 🚀 Quick Start
+**Important Security Note**: The current implementation includes the client secret in the frontend code for demonstration purposes. In a production environment, you should:
+- Handle token exchange on your backend server
+- Never expose client secrets in frontend code
+- Use environment variables for sensitive configuration
 
-### Option 1: Local Development
+### 2. Google Maps API (Optional)
+
+For more accurate car travel time estimates:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable the **Directions API**
+4. Create an API key with appropriate restrictions
+5. Update `src/config/maps.js`:
+
+```javascript
+export const MAPS_CONFIG = {
+  api_key: "your_google_maps_api_key",
+  directions_endpoint: "https://maps.googleapis.com/maps/api/directions/json"
+};
+```
+
+**Note**: If no Google Maps API key is provided, the app will use an intelligent mock algorithm that factors in:
+- Traffic patterns by time of day and day of week
+- Parking and preparation time
+- Traffic light delays
+- Urban driving conditions
+
+### 3. Install and Run
+
 ```bash
-# Clone the repository
-git clone https://github.com/yourusername/bike-repair-app.git
-cd bike-repair-app
-
 # Install dependencies
-pip3 install -r requirements.txt
+npm install
 
-# Copy and configure settings
-cp config_example.py config.py
-# Edit config.py with your API keys
+# Start development server
+npm run dev
 
-# Test the setup
-python3 test_traffic_comparison.py
+# Build for production
+npm run build
 ```
 
-### Option 2: Mac Mini Deployment
+## How It Works
+
+### Authentication Flow
+1. User clicks "Connect with Strava"
+2. Redirected to Strava OAuth with proper scopes
+3. After authorization, returns with authorization code
+4. Code is exchanged for access token and refresh token
+5. Tokens stored locally with automatic refresh handling
+
+### API Integration
+- **Rate Limiting**: Respects Strava's 100 requests per 15 minutes limit
+- **Token Management**: Automatic refresh when tokens expire
+- **Error Handling**: Graceful handling of API errors and rate limits
+- **Data Filtering**: Only analyzes rides with GPS coordinates and reasonable distance
+
+### Travel Time Analysis
+1. Fetches recent rides from Strava API
+2. Filters rides with GPS coordinates and minimum distance
+3. For each ride, estimates car travel time using:
+   - **Google Maps API**: Real-time traffic data and optimal routing
+   - **Mock Algorithm**: Intelligent estimation based on:
+     - Straight-line distance × road factor (1.3x)
+     - Base urban speed (35 km/h)
+     - Traffic multipliers by time/day
+     - Parking time (+7 minutes)
+     - Traffic light delays
+
+### Time Savings Calculation
+```
+Time Saved = Estimated Car Time - Actual Bike Time
+```
+
+Positive values mean biking was faster, negative means driving would have been faster.
+
+## Features
+
+### Dashboard Statistics
+- Total analyzed rides
+- Total time saved
+- Average time saved per ride
+- Total distance covered
+
+### Individual Ride Analysis
+- Ride name and date
+- Distance and bike time
+- Estimated car time with traffic conditions
+- Time saved/lost comparison
+- Traffic condition indicators (light/moderate/heavy)
+- Data source indicator (Google Maps vs Estimated)
+
+### Smart Traffic Estimation
+When Google Maps isn't available, the mock algorithm considers:
+
+**Traffic Patterns**:
+- Rush hours (7-9 AM, 5-7 PM): 1.4-1.5x slower
+- Lunch time (12-1 PM): 1.1x slower  
+- Late night (11 PM - 5 AM): 0.7-0.8x faster
+- Weekends: Generally lighter traffic
+
+**Additional Factors**:
+- Parking time: +7 minutes average
+- Traffic lights: Distance-based delay estimation
+- Urban efficiency: 35 km/h average speed
+
+## API Limits and Rate Limiting
+
+### Strava API Limits
+- **Daily**: 1,000 requests per day
+- **15-minute**: 100 requests per 15 minutes
+- **Per-request**: 200ms minimum delay between requests
+
+### Google Maps API Limits
+- **Free Tier**: 2,500 requests per day
+- **Paid Plans**: Higher limits available
+
+The app automatically handles rate limiting and will show appropriate error messages if limits are exceeded.
+
+## Technology Stack
+
+- **React 18**: Modern React with hooks
+- **Vite**: Fast development and build tool
+- **Tailwind CSS**: Utility-first styling
+- **Lucide React**: Beautiful icons
+- **Strava API v3**: Activity data with OAuth 2.0
+- **Google Maps Directions API**: Traffic data (optional)
+
+## Security & Privacy
+
+- **OAuth 2.0**: Secure authentication flow
+- **Token Management**: Automatic refresh with secure storage
+- **Minimal Permissions**: Only reads activity data (no write permissions)
+- **Local Processing**: All analysis happens in your browser
+- **No Data Collection**: No user data sent to external servers
+
+## Browser Compatibility
+
+- Modern browsers with ES6+ support
+- Chrome, Firefox, Safari, Edge
+- Mobile responsive design
+
+## Development
+
 ```bash
-# Follow the complete setup guide
-# See MAC_MINI_SETUP.md for detailed instructions
+# Development server
+npm run dev
 
-# Start the full service
-python3 start_mac_mini_service.py
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+
+# Lint code
+npm run lint
 ```
 
-## 🔧 Configuration
-
-### Required API Keys
-1. **Strava API** - Get from [Strava API Settings](https://www.strava.com/settings/api)
-2. **Google Maps API** - Get from [Google Cloud Console](https://console.cloud.google.com/)
-
-### Configuration File
-Copy `config_example.py` to `config.py` and fill in your credentials:
-```python
-STRAVA_CLIENT_ID = "your_client_id"
-STRAVA_CLIENT_SECRET = "your_client_secret"
-STRAVA_ACCESS_TOKEN = "your_access_token"
-GOOGLE_MAPS_API_KEY = "your_maps_api_key"
-```
-
-## 📊 Usage Examples
-
-### Monitor Traffic Comparisons
-```bash
-# Start continuous monitoring
-python3 run_monitor.py
-
-# View web dashboard
-python3 web_dashboard.py
-# Then visit http://localhost:5000
-```
-
-### Analyze Brake Wear
-```bash
-# Run brake wear analysis
-python3 run_strava_analysis.py
-
-# Test with sample data
-python3 test_sample.py
-```
-
-### Capture Historical Data
-```bash
-# Capture traffic data for existing rides
-python3 capture_historical_traffic.py
-```
-
-## 🌐 Web Dashboard
-
-The web dashboard provides:
-- **Real-time statistics** - Total rides, time saved, efficiency metrics
-- **Connection status** - Monitor online/offline status
-- **Recent rides** - Detailed traffic comparisons
-- **Mobile-friendly** - Responsive design for all devices
-- **Network access** - Accessible from any device on your network
-
-### Access URLs
-- **Local:** `http://localhost:5000`
-- **Network:** `http://[YOUR_IP]:5000`
-
-## 📱 Mobile Access
-
-### iPhone/iPad
-1. Open Safari → Go to dashboard URL
-2. Tap share button → "Add to Home Screen"
-3. Now you have a native app icon!
-
-### Android
-1. Open Chrome → Go to dashboard URL
-2. Tap menu → "Add to Home screen"
-3. Native app experience
-
-## 🔄 GitHub Management
-
-### Repository Setup
-```bash
-# Initialize git repository
-git init
-
-# Add files (excluding sensitive data)
-git add .
-
-# Initial commit
-git commit -m "Initial commit: Strava Traffic Monitor"
-
-# Add remote repository
-git remote add origin https://github.com/yourusername/bike-repair-app.git
-
-# Push to GitHub
-git push -u origin main
-```
-
-### Development Workflow
-```bash
-# Create feature branch
-git checkout -b feature/new-feature
-
-# Make changes and commit
-git add .
-git commit -m "Add new feature"
-
-# Push to GitHub
-git push origin feature/new-feature
-
-# Create pull request on GitHub
-# Merge after review
-```
-
-### Deployment Workflow
-```bash
-# On Mac Mini, pull latest changes
-git pull origin main
-
-# Restart service if needed
-launchctl restart com.strava.monitor
-```
-
-### Security Best Practices
-- ✅ **Never commit** `config.py` (contains API keys)
-- ✅ **Use environment variables** for production
-- ✅ **Regular backups** of database files
-- ✅ **Monitor API usage** and rate limits
-
-## 🛠️ Development
-
-### Adding New Features
-1. Create feature branch: `git checkout -b feature/name`
-2. Implement changes
-3. Test thoroughly
-4. Update documentation
-5. Create pull request
-
-### Testing
-```bash
-# Run all tests
-python3 test_sample.py
-python3 test_traffic_comparison.py
-
-# Test web dashboard
-python3 web_dashboard.py
-# Visit http://localhost:5000
-```
-
-### Code Style
-- Follow PEP 8 Python style guide
-- Add docstrings to all functions
-- Include type hints where helpful
-- Write clear commit messages
-
-## 📈 Performance & Monitoring
-
-### Database Management
-- SQLite database auto-created on first run
-- Regular backups recommended
-- Monitor database size over time
-
-### API Rate Limits
-- Strava: 1000 requests/day
-- Google Maps: Varies by plan
-- Monitor usage in dashboard
-
-### System Requirements
-- **Mac Mini:** 4GB+ RAM, SSD recommended
-- **Python:** 3.7+ required
-- **Network:** Always-on internet connection
-
-## 🔒 Security
-
-### API Key Management
-- Store keys in `config.py` (not in git)
-- Use environment variables for production
-- Rotate keys regularly
-- Monitor for unauthorized usage
-
-### Network Security
-- Dashboard only accessible on local network
-- Consider adding authentication for production
-- Use HTTPS for external access
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch
-3. Make changes
-4. Add tests
-5. Update documentation
-6. Submit pull request
-
-## 📄 License
-
-This project is open source. Please ensure you comply with:
-- Strava's API terms of service
-- Google Maps API terms of service
-- Any other third-party service agreements
-
-## 🆘 Support
+## Troubleshooting
 
 ### Common Issues
-1. **API rate limits** - Check usage in dashboard
-2. **Connection issues** - Monitor offline/online status
-3. **Database errors** - Check file permissions
-4. **Service won't start** - Check logs and dependencies
 
-### Getting Help
-1. Check the logs: `tail -f /tmp/strava_monitor.log`
-2. Verify configuration in `config.py`
-3. Test with sample data first
-4. Check GitHub issues for known problems
+1. **"Authentication failed"**: 
+   - Check your Strava Client ID in `src/config/strava.js`
+   - Verify redirect URI matches your Strava app settings
+   - Ensure you're using the correct authorization callback domain
 
----
+2. **"Rate limit exceeded"**: 
+   - Wait for the rate limit window to reset (15 minutes)
+   - The app will automatically retry after the limit resets
 
-**Happy cycling! 🚴‍♂️** Track your rides, beat traffic, and keep your bike in top condition.
+3. **"No activities found"**: 
+   - Ensure your rides have GPS data
+   - Check that rides are longer than 500 meters
+   - Verify your Strava privacy settings allow API access
+
+4. **"Failed to analyze"**: 
+   - Check network connection
+   - Verify Google Maps API key (if using)
+   - Check browser console for detailed error messages
+
+### API Setup Issues
+
+1. **Strava OAuth Errors**:
+   - Verify your app's authorization callback domain is set to `localhost`
+   - Check that your Client ID matches exactly
+   - Ensure your app has the correct scopes: `read,activity:read_all`
+
+2. **Google Maps CORS Issues**:
+   - The app will automatically fall back to mock estimation
+   - Consider using a backend proxy for production deployments
+
+### Token Issues
+
+1. **Token Expired**: The app automatically refreshes tokens
+2. **Invalid Token**: Logout and re-authenticate
+3. **Missing Refresh Token**: Re-authenticate to get new tokens
+
+## Production Deployment
+
+For production deployment, consider:
+
+1. **Backend Token Exchange**: Move client secret to backend
+2. **Environment Variables**: Use proper environment configuration
+3. **HTTPS**: Required for OAuth in production
+4. **CORS Proxy**: For Google Maps API if needed
+5. **Error Monitoring**: Add error tracking service
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## License
+
+MIT License - feel free to use and modify as needed.
+
+## Support
+
+For issues related to:
+- **Strava API**: Check [Strava Developer Documentation](https://developers.strava.com/docs/)
+- **Google Maps API**: Check [Google Maps Platform Documentation](https://developers.google.com/maps/documentation)
+- **App Issues**: Create an issue in this repository
